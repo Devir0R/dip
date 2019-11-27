@@ -22,21 +22,29 @@ fig,ax = plt.subplots(1,2)
 ax[0].imshow(img)
 ax[1].imshow(img2)
 circle = plt.Circle(point, radius=radius, color='r',fill=False)
+circle2 = plt.Circle(point, radius=radius, color='r',fill=False)
 ax[0].add_artist(circle)
+ax[1].add_artist(circle2)
 ax[0].set_title('Click to move the circle')
 
 def move_circle(event):
-    global fig,circle
+    global fig,circle,img,circle2
     print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
         ('double' if event.dblclick else 'single', event.button,
         event.x, event.y, event.xdata, event.ydata))
+    print(event.inaxes)
+    print(event.inaxes==ax[0])
     if event.inaxes is None:
         return
-    if event.button==3 or event.button==2:
-        px,py=circle.center
-        circle.radius = int(np.sqrt((event.xdata-px)**2+(event.ydata-py)**2))
-    elif event.button==1:
-        circle.center = event.xdata, event.ydata
+    if event.inaxes==ax[0]:
+        if event.button==3 or event.button==2:
+            px,py=circle.center
+            circle.radius = int(np.sqrt((event.xdata-px)**2+(event.ydata-py)**2))
+            circle2.radius = circle.radius
+        elif event.button==1:
+            circle.center = event.xdata, event.ydata
+    elif event.inaxes==ax[1]:
+        circle2.center = event.xdata, event.ydata
     #change_circle_in_img_2(event)
     fig.canvas.draw()
 
@@ -47,5 +55,6 @@ def change_circle_in_img_2(event):
 ##https://stackoverflow.com/questions/52365190/blur-a-specific-part-of-an-image
 
 fig.canvas.mpl_connect('button_press_event', move_circle)
+
 plt.show()
 
