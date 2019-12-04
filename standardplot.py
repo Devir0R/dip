@@ -216,6 +216,7 @@ def change_circle_in_img_2(event):
 print(bilinear((14.5,20.2),img))
 
 ##https://stackoverflow.com/questions/52365190/blur-a-specific-part-of-an-image
+#https://www.pyimagesearch.com/2017/01/02/rotate-images-correctly-with-opencv-and-python/
 
 fig.canvas.mpl_connect('button_press_event', move_circle)
 
