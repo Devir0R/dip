@@ -2,50 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import cv2
 
-#######INTERPOLATIONS######
-def nearest_neighbor(points_3d,point_2d):
-    x,y = point_2d
-    for p in points_3d:
-        px,py,p_color = p
-        if np.round(x)==px and np.round(y)==py:
-            return p_color
-    raise Exception("I know python!")
-
-def bilinear(points_3d,point_2d):#[(0,0),(0,1),(1,0),(1,1)]
-    p00 = points_3d[0]
-    p01 = points_3d[1]
-    p10 = points_3d[2]
-    p11 = points_3d[3]
-    p00_x,p00_y,p00_color = p00
-    p01_color = p01[2]
-    p10_color = p10[2]
-    p11_x,p11_y,p11_color = p11
-
-    x,y=point_2d
-
-    ##delta_x=1   #p11_x-p00_x
-    ##delta_y=1   #p11_y-p00_y
-
-    I_x0 = (p11_x-x)*p00_color + (x-p00_x)*p01_color ##/delta_x
-    I_x1 = (p11_x-x)*p10_color + (x-p00_x)*p11_color##delta_x
-
-    I_y = (p11_y-y)*I_x0 + (y-p00_y)*I_x1##delta_y
-    return I_y
-
-
-
-def bicubic(points_3d,point_2d):
-    print()
-
-def interpolation(kind,points_3d,point_2d):
-    if(kind=='nearest_neighbor'):
-        return nearest_neighbor(points_3d,point_2d)
-    elif(kind=='bilinear'):
-        return bilinear(points_3d,point_2d)
-    elif(kind=='bicubic'):
-        return bicubic(points_3d,point_2d)
-
-
 
 ###IMAGE READ###
 img = cv2.imread("saber.jpg",cv2.IMREAD_UNCHANGED)
@@ -53,6 +9,138 @@ img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 img2 = cv2.imread("saber.jpg",cv2.IMREAD_UNCHANGED)
 img2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
+
+
+###utilities###
+
+def getAngle(p1,p2):
+    x1,y1 = p1
+    x2,y2 = p2
+    x = x2-x1
+    y = y2-y1
+    return (np.pi/2) - np.arctan(y/x)
+
+M_dim_left = np.array([[1,0,0,0],[0,0,1,0],[-3,3,-2,1],[2,-2,1,1]])
+M_dim_right = np.array([[1,0,-3,2],[0,0,3,-2],[0,1,-2 ,1],[0,0,-1,1]])
+
+
+#######INTERPOLATIONS######
+def nearest_neighbor(point_2d,img):
+    x,y = point_2d
+    x = np.round(x)
+    y = np.round(y)
+    if x>0 and y>0 and x< img.shape[1] and y<img.shape[0]:
+        return img[x,y]
+    else:
+        return 0
+
+def bilinear(point_2d,img):#[(0,0),(0,1),(1,0),(1,1)]
+    x,y = point_2d
+    x = np.round(x)
+    y = np.round(y)
+    p00 = (x,y)
+    ##p01 = (x,y+1)
+    #p10 = (x+1,y)
+    p11 = (x+1,y+1)
+    p00_x,p00_y = p00
+    p11_x,p11_y = p11
+
+    x,y=point_2d
+
+    ##delta_x=1   #p11_x-p00_x
+    ##delta_y=1   #p11_y-p00_y
+
+    I_x0 = (p11_x-x)*img[x,y] + (x-p00_x)*img[x,y+1] ##/delta_x
+    I_x1 = (p11_x-x)*img[x+1,y] + (x-p00_x)*img[x+1,y+1]##delta_x
+
+    I_y = (p11_y-y)*I_x0 + (y-p00_y)*I_x1##delta_y
+    return I_y
+
+#### bicubic interpolation stuff #######
+I = img
+
+x,y = I.shape
+j = x
+k = y
+temp_image = np.zeros((x,y))
+ 
+Ix = np.zeros((j,k))
+for count1 in range(0,j):
+    for count2 in range(0,k):
+        if( (count2==1) or (count2==k) ):
+            Ix[count1,count2]=0
+        else:
+            Ix[count1,count2]=0.5*(I[count1,count2+1]-I[count1,count2-1])
+ 
+Iy = np.zeros((j,k))
+for count1 in range(0,j):
+    for count2  in range(0,k):
+            if( (count1==1) or (count1==j) ):
+                Iy[count1,count2]=0
+            else:
+                Iy[count1,count2]=0.5*(I[count1+1,count2]-I[count1-1,count2])
+
+Ixy = np.zeros((j,k))
+for count1 in range(0,j):
+    for count2  in range(0,k):
+        if( (count1==1) or (count1==j) or (count2==1) or (count2==k) ):                
+            Ixy[count1,count2]=0
+        else:
+            Ixy[count1,count2]=0.25*((I[count1,count2]+I[count1,count2]) - (I[count1,count2]+I[count1,count2]))
+
+def bicubic(point_2d,img):
+    count1,count2 = point_2d
+    I=img
+    I11_index = [1+np.floor(count1),1+np.floor(count2)]
+    I21_index = [1+np.floor(count1),1+np.ceil(count2)]
+    I12_index = [1+np.ceil(count1),1+np.floor(count2)]
+    I22_index = [1+np.ceil(count1),1+np.ceil(count2)]
+    #%Calculate the four nearest function values
+    I11 = I[I11_index[1],I11_index[2]]
+    I21 = I[I21_index[1],I21_index[2]]
+    I12 = I[I12_index[1],I12_index[2]]
+    I22 = I[I22_index[1],I22_index[2]]
+    #%Calculate the four nearest horizontal derivatives
+    Ix11 = Ix[I11_index[1],I11_index[2]]
+    Ix21 = Ix[I21_index[1],I21_index[2]]
+    Ix12 = Ix[I12_index[1],I12_index[2]]
+    Ix22 = Ix[I22_index[1],I22_index[2]]
+    #%Calculate the four nearest vertical derivatives
+    Iy11 = Iy[I11_index[1],I11_index[2]]
+    Iy21 = Iy[I21_index[1],I21_index[2]]
+    Iy12 = Iy[I12_index[1],I12_index[2]]
+    Iy22 = Iy[I22_index[1],I22_index[2]]
+    #%Calculate the four nearest cross derivatives
+    Ixy11 = Ixy[I11_index[1],I11_index[2]]
+    Ixy21 = Ixy[I21_index[1],I21_index[2]]
+    Ixy12 = Ixy[I12_index[1],I12_index[2]]
+    Ixy22 = Ixy[I22_index[1],I22_index[2]]
+    #%Create our beta-vector
+    #beta = np.array([I11,I21,I12,I22,Ix11,Ix21,Ix12,Ix22,Iy11,Iy21,Iy12, Iy22, Ixy11, Ixy21, Ixy12, Ixy22])
+    beta2 = np.array(
+        [
+            [I11,I12,Iy11,Iy12],
+            [I21,I22,Iy21,Iy22],
+            [Ix11,Ix12,Ixy11, Ixy12],
+            [Ix21, Ix22, Ixy21, Ixy22]
+        ])
+    coef = np.matmul(np.matmul(M_dim_left,beta2),M_dim_right)
+    x_array = np.array([1,count1,count1*count1,count1*count1*count1])
+    y_array = np.array([1,count2,count2*count2,count2*count2*count2])
+    ans = np.matmul(np.matmul(x_array,coef),y_array)
+    return ans
+        
+
+###### end of bicubic #########
+def interpolation(kind,point_2d,img):
+    if(kind=='nearest_neighbor'):
+        return nearest_neighbor(point_2d,img)
+    elif(kind=='bilinear'):
+        return bilinear(point_2d,img)
+    elif(kind=='bicubic'):
+        return bicubic(point_2d,img)
+
+
 
 ###IMAGE CIRCLE POSITION###
 y,x = img.shape
@@ -106,53 +194,45 @@ plt.show()
 
 
 
-# def getBicPixelChannel(img,x,y,channel):
-# if (x < img.shape[1]) and (y < img.shape[0]):
-#     return img[y,x,channel]
+def getBicPixel(img,x,y):
+  if (x < img.shape[1]) and (y < img.shape[0]):
+    return img[y,x]
+  return 0
 
-# return 0
 
+def Bicubic(img, rate):
+  new_w = int(np.ceil(float(img.shape[1]) * rate))
+  new_h = int(np.ceil(float(img.shape[0]) * rate))
 
-# def Bicubic(img, rate):
-# new_w = int(math.ceil(float(img.shape[1]) * rate))
-# new_h = int(math.ceil(float(img.shape[0]) * rate))
+  new_img = np.zeros((new_w, new_h, 3))
 
-# new_img = np.zeros((new_w, new_h, 3))
+  x_rate = float(img.shape[1]) / img.shape[1]
+  y_rate = float(img.shape[0]) / img.shape[0]
 
-# x_rate = float(img.shape[1]) / new_img.shape[1]
-# y_rate = float(img.shape[0]) / new_img.shape[0]
+  C = np.zeros(5)
 
-# C = np.zeros(5)
-
-# for hi in range(new_img.shape[0]):
-#     for wi in range(new_img.shape[1]):
-
-#         x_int = int(wi * x_rate)
-#         y_int = int(hi * y_rate)
-
-#         dx = x_rate * wi - x_int
-#         dy = y_rate * hi - y_int
-
-#         for channel in range(new_img.shape[2]):
-#             for jj in range(0,4):
-#                 o_y = y_int - 1 + jj
-#                 a0 = getBicPixelChannel(img,x_int,o_y, channel)
-#                 d0 = getBicPixelChannel(img,x_int - 1,o_y, channel) - a0
-#                 d2 = getBicPixelChannel(img,x_int + 1,o_y, channel) - a0
-#                 d3 = getBicPixelChannel(img,x_int + 2,o_y, channel) - a0
-
-#                 a1 = -1./3 * d0 + d2 - 1./6 * d3
-#                 a2 = 1./2 * d0 + 1./2 * d2
-#                 a3 = -1./6 * d0 - 1./2 * d2 + 1./6 * d3
-#                 C[jj] = a0 + a1 * dx + a2 * dx * dx + a3 * dx * dx * dx
-
-#             d0 = C[0] - C[1]
-#             d2 = C[2] - C[1]
-#             d3 = C[3] - C[1]
-#             a0 = C[1]
-#             a1 = -1. / 3 * d0 + d2 - 1. / 6 * d3
-#             a2 = 1. / 2 * d0 + 1. / 2 * d2
-#             a3 = -1. / 6 * d0 - 1. / 2 * d2 + 1. / 6 * d3
-#             new_img[hi, wi, channel] = a0 + a1 * dy + a2 * dy * dy + a3 * dy * dy * dy
-
-# return new_img
+  for hi in range(img.shape[0]):
+    for wi in range(img.shape[1]):
+        x_int = int(wi * x_rate)
+        y_int = int(hi * y_rate)
+        dx = x_rate * wi - x_int
+        dy = y_rate * hi - y_int
+        for jj in range(0,4):
+            o_y = y_int - 1 + jj
+            a0 = getBicPixel(img,x_int,o_y)
+            d0 = getBicPixel(img,x_int - 1,o_y) - a0
+            d2 = getBicPixel(img,x_int + 1,o_y) - a0
+            d3 = getBicPixel(img,x_int + 2,o_y) - a0
+            a1 = -1./3 * d0 + d2 - 1./6 * d3
+            a2 = 1./2 * d0 + 1./2 * d2
+            a3 = -1./6 * d0 - 1./2 * d2 + 1./6 * d3
+            C[jj] = a0 + a1 * dx + a2 * dx * dx + a3 * dx * dx * dx
+        d0 = C[0] - C[1]
+        d2 = C[2] - C[1]
+        d3 = C[3] - C[1]
+        a0 = C[1]
+        a1 = -1. / 3 * d0 + d2 - 1. / 6 * d3
+        a2 = 1. / 2 * d0 + 1. / 2 * d2
+        a3 = -1. / 6 * d0 - 1. / 2 * d2 + 1. / 6 * d3
+        new_img[hi, wi] = a0 + a1 * dy + a2 * dy * dy + a3 * dy * dy * dy
+  return new_img
