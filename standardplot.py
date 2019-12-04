@@ -13,16 +13,46 @@ img2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
 ###utilities###
 
+M_dim_left = np.array([[1,0,0,0],[0,0,1,0],[-3,3,-2,1],[2,-2,1,1]])
+M_dim_right = np.array([[1,0,-3,2],[0,0,3,-2],[0,1,-2 ,1],[0,0,-1,1]])
+
 def getAngle(p1,p2):
     x1,y1 = p1
     x2,y2 = p2
     x = x2-x1
     y = y2-y1
-    return (np.pi/2) - np.arctan(y/x)
+    add_degrees = 0
+    if(x2<x1):
+        if(y2<y1):
+            add_degrees = 90
+        else:
+            add_degrees = 180
+    print(np.arctan(y/x))
+    return 360*( np.arctan(y/x)/(2*np.pi)) + add_degrees
 
-M_dim_left = np.array([[1,0,0,0],[0,0,1,0],[-3,3,-2,1],[2,-2,1,1]])
-M_dim_right = np.array([[1,0,-3,2],[0,0,3,-2],[0,1,-2 ,1],[0,0,-1,1]])
-
+def rotate_bound(image, angle,pivot):
+    # grab the dimensions of the image and then determine the
+    # center
+    (h, w) = image.shape[:2]
+    cX, cY = pivot
+ 
+    # grab the rotation matrix (applying the negative of the
+    # angle to rotate clockwise), then grab the sine and cosine
+    # (i.e., the rotation components of the matrix)
+    M = cv2.getRotationMatrix2D((cX, cY), -angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+ 
+    # compute the new bounding dimensions of the image
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+ 
+    # adjust the rotation matrix to take into account translation
+    M[0, 2] += (nW / 2) - cX
+    M[1, 2] += (nH / 2) - cY
+ 
+    # perform the actual rotation and return the image
+    return cv2.warpAffine(image, M, (nW, nH))
 
 #######INTERPOLATIONS######
 def nearest_neighbor(point_2d,img):
@@ -36,16 +66,14 @@ def nearest_neighbor(point_2d,img):
 
 def bilinear(point_2d,img):#[(0,0),(0,1),(1,0),(1,1)]
     x,y = point_2d
-    x = np.round(x)
-    y = np.round(y)
+    x = int(np.round(x))
+    y = int(np.round(y))
     p00 = (x,y)
     ##p01 = (x,y+1)
     #p10 = (x+1,y)
     p11 = (x+1,y+1)
     p00_x,p00_y = p00
     p11_x,p11_y = p11
-
-    x,y=point_2d
 
     ##delta_x=1   #p11_x-p00_x
     ##delta_y=1   #p11_y-p00_y
@@ -65,24 +93,24 @@ k = y
 temp_image = np.zeros((x,y))
  
 Ix = np.zeros((j,k))
-for count1 in range(0,j):
-    for count2 in range(0,k):
+for count1 in range(0,j-1):
+    for count2 in range(0,k-1):
         if( (count2==1) or (count2==k) ):
             Ix[count1,count2]=0
         else:
             Ix[count1,count2]=0.5*(I[count1,count2+1]-I[count1,count2-1])
  
 Iy = np.zeros((j,k))
-for count1 in range(0,j):
-    for count2  in range(0,k):
+for count1 in range(0,j-1):
+    for count2  in range(0,k-1):
             if( (count1==1) or (count1==j) ):
                 Iy[count1,count2]=0
             else:
                 Iy[count1,count2]=0.5*(I[count1+1,count2]-I[count1-1,count2])
 
 Ixy = np.zeros((j,k))
-for count1 in range(0,j):
-    for count2  in range(0,k):
+for count1 in range(0,j-1):
+    for count2  in range(0,k-1):
         if( (count1==1) or (count1==j) or (count2==1) or (count2==k) ):                
             Ixy[count1,count2]=0
         else:
@@ -177,6 +205,7 @@ def move_circle(event):
             circle.center = event.xdata, event.ydata
     elif event.inaxes==ax[1]:
         circle2.center = event.xdata, event.ydata
+        ax[1].imshow(rotate_bound(img,getAngle(circle.center,circle2.center),circle.center))
     #change_circle_in_img_2(event)
     fig.canvas.draw()
 
@@ -184,7 +213,7 @@ def change_circle_in_img_2(event):
     global img2,circle
  
 
-print(bilinear([(14,20,91),(14,21,210),(15,20,162),(15,21,95)],(14.5,20.2)))
+print(bilinear((14.5,20.2),img))
 
 ##https://stackoverflow.com/questions/52365190/blur-a-specific-part-of-an-image
 
