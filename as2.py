@@ -11,7 +11,35 @@ def calcHistogram(image):
     return hist
 
 def findThresh(hist):
-    sum = reduce((lambda x, y: x+y),hist)
+    sum = 0
+    for i in range(0,len(hist)):
+        sum += hist[i]
+    half = sum/2
+    
+    for i in range(0,len(hist)):
+        half = half - hist[i]
+        if half <= 0:
+            return i
+    return len(hist)
+                    
+def findAllExtremes(arr):
+    tendency = 0
+    extremes = []
+    for i in range(1,len(arr)):
+        if(arr[i-1]>arr[i]):
+            if tendency >= 0:
+                extremes.append(('max',arr[i-1],i-1))
+                tendency = -1
+        elif(arr[i]>arr[i-1]):
+            if tendency <= 0: 
+                extremes.append(('min',arr[i-1],i-1))
+                tendency = 1
+    if tendency==1:
+        extremes.append(('max',arr[len(arr)-1],arr[len(arr)-1]))
+    if tendency==-1:
+        extremes.append(('min',arr[len(arr)-1],arr[len(arr)-1]))
+    return extremes
+
 
 
 def mapFunc(f,arr):
@@ -41,17 +69,19 @@ def getFirst(arr):
     return arr[0]
     
 
-cnt_area_thresh = 29/227.5
-imgray =  cv2.imread("saber.jpg",cv2.IMREAD_GRAYSCALE)
+cnt_area_thresh = 16/191
+imgray =  cv2.imread("in.jpg",cv2.IMREAD_GRAYSCALE)
 edited_img = imgray.copy()
 #imgray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
-threshhold = 180
+# middleThresh = findThresh(calcHistogram(imgray))
+# print(middleThresh)
+
+print(findAllExtremes(calcHistogram(imgray)))
+
+threshhold = 130
 ret, thresh = cv2.threshold(imgray,threshhold, 255, cv2.THRESH_BINARY)
-
 contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
-final = thresh
 
 bounding_boxes = list(mapFunc(lambda cnt: cv2.boundingRect(cnt),contours))
 bounding_boxes.sort(key=getFirst)
@@ -82,18 +112,14 @@ for cnt_i in range(0,len(contours)):
 #print(boxes_sizes)
 #print("\nbounding boxes")
 #print(bounding_boxes)
-#print("\nsizes")
-#print(list(sizes))
+print("\nsizes")
+print(list(sizes))
 #print(cnt_area_thresh)
 #bb=dict(zip(list(boxes_sizes),[list(boxes_sizes).count(i) for i in list(boxes_sizes)]))
 #print(sorted(list(bb)))
 
+cv2.imwrite("out.jpg",edited_img)
 
-
-
-#plt.plot(range(0,256),calcHistogram(imgray))
-cv2.imshow("saber",edited_img)
-cv2.waitKey(0)
-cv2.destroyAllWindows() 
-#sum = reduce((lambda x, y: x+y),calcHistogram(imgray))
-#print(contours)
+# print(calcHistogram(imgray))
+# plt.plot(range(0,256),calcHistogram(imgray))
+# plt.show()
