@@ -1,34 +1,95 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import cv2
-
+import math
 
 ###IMAGE READ###
-img = cv2.imread("saber.jpg",cv2.IMREAD_UNCHANGED)
-img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+img = cv2.imread("saber.jpg",cv2.IMREAD_GRAYSCALE)
 
-img2 = cv2.imread("saber.jpg",cv2.IMREAD_UNCHANGED)
-img2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
 
 ###utilities###
+def angle_between_vector(a,b,c):
+    a = np.array([a[0],a[1]])
+    b = np.array([b[0],b[1]])
+    c = np.array([c[0],c[1]])
+    ba = a - b
+    bc = c - b
 
-M_dim_left = np.array([[1,0,0,0],[0,0,1,0],[-3,3,-2,1],[2,-2,1,1]])
-M_dim_right = np.array([[1,0,-3,2],[0,0,3,-2],[0,1,-2 ,1],[0,0,-1,1]])
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    angle = np.arccos(cosine_angle)
+    return angle
+
+def distance(start,finish,point):
+    s_x,s_y = start
+    p1_=np.array([s_x,s_y])
+
+    f_x,f_y = finish
+    p2_=np.array([f_x,f_y])
+
+    p_x,p_y = point
+    p3_=np.array([p_x,p_y])
+    d=np.cross(p2_-p1_,p3_-p1_)/np.linalg.norm(p2_-p1_)
+    return d
+
+def rotate_origin_only(xy, radians):
+    """Only rotate a point around the origin (0, 0)."""
+    x, y = xy
+    xx = x * math.cos(radians) + y * math.sin(radians)
+    yy = -x * math.sin(radians) + y * math.cos(radians)
+
+    return xx, yy
+
+def getAngleRadians(p1,p2):
+    x1,y1 = p1
+    x2,y2 = p2
+    x = x2-x1
+    y = y2-y1
+    ans = np.arctan(y/x)
+    if(x2<x1):
+        if (y2<y1):
+            ans = -np.pi+ans
+        else:
+            ans = np.pi + ans
+    return ans
+
+def rotate_on_pivot(pivot,xy):
+    xp,yp = pivot
+    x,y = xy
+    rotated = rotate_origin_only((x-xp,y-yp),getAngleRadians(pivot,xy))
+    return xp+rotated[0],yp+rotated[1]
+
+M = np.array([
+    [1 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0 , 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [-3, 3, 0, 0,-2,-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [ 2,-2, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+    [ 0, 0, 0, 0, 0, 0, 0, 0,-3, 3, 0, 0,-2,-1, 0, 0],
+    [ 0, 0, 0, 0, 0, 0, 0, 0, 2,-2, 0, 0, 1, 1, 0, 0],
+    [-3, 0, 3, 0, 0, 0, 0, 0,-2, 0,-1, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0,-3, 0, 3, 0, 0, 0, 0, 0,-2, 0,-1, 0],
+    [ 9,-9,-9, 9, 6, 3,-6,-3, 6,-6, 3,-3, 4, 2, 2, 1],
+    [-6, 6, 6,-6,-3,-3, 3, 3,-4, 4,-2, 2,-2,-2,-1,-1],
+    [ 2, 0,-2, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0, 2, 0,-2, 0, 0, 0, 0, 0, 1, 0, 1, 0],
+    [-6, 6, 6,-6,-4,-2, 4, 2,-3, 3,-3, 3,-2,-1,-2,-1],
+    [ 4,-4,-4, 4, 2, 2,-2,-2, 2,-2, 2,-2, 1, 1, 1, 1]
+])
 
 def getAngle(p1,p2):
     x1,y1 = p1
     x2,y2 = p2
     x = x2-x1
     y = y2-y1
-    add_degrees = 0
+    ans = np.arctan(y/x)
     if(x2<x1):
-        if(y2<y1):
-            add_degrees = 90
+        if (y2<y1):
+            ans = -np.pi+ans
         else:
-            add_degrees = 180
-    print(np.arctan(y/x))
-    return 360*( np.arctan(y/x)/(2*np.pi)) + add_degrees
+            ans = np.pi + ans
+    return 360*( ans/(2*np.pi))-90
 
 def rotate_bound(image, angle,pivot):
     # grab the dimensions of the image and then determine the
@@ -57,8 +118,8 @@ def rotate_bound(image, angle,pivot):
 #######INTERPOLATIONS######
 def nearest_neighbor(point_2d,img):
     x,y = point_2d
-    x = np.round(x)
-    y = np.round(y)
+    x = int(np.round(x))
+    y = int(np.round(y))
     if x>0 and y>0 and x< img.shape[1] and y<img.shape[0]:
         return img[x,y]
     else:
@@ -98,7 +159,7 @@ for count1 in range(0,j-1):
         if( (count2==1) or (count2==k) ):
             Ix[count1,count2]=0
         else:
-            Ix[count1,count2]=0.5*(I[count1,count2+1]-I[count1,count2-1])
+            Ix[count1,count2]=int(0.5*(I[count1,count2+1]-I[count1,count2-1]))
  
 Iy = np.zeros((j,k))
 for count1 in range(0,j-1):
@@ -106,7 +167,7 @@ for count1 in range(0,j-1):
             if( (count1==1) or (count1==j) ):
                 Iy[count1,count2]=0
             else:
-                Iy[count1,count2]=0.5*(I[count1+1,count2]-I[count1-1,count2])
+                Iy[count1,count2]=int(0.5*(I[count1+1,count2]-I[count1-1,count2]))
 
 Ixy = np.zeros((j,k))
 for count1 in range(0,j-1):
@@ -114,59 +175,68 @@ for count1 in range(0,j-1):
         if( (count1==1) or (count1==j) or (count2==1) or (count2==k) ):                
             Ixy[count1,count2]=0
         else:
-            Ixy[count1,count2]=0.25*((I[count1,count2]+I[count1,count2]) - (I[count1,count2]+I[count1,count2]))
+            Ixy[count1,count2]=int(0.25*((I[count1,count2]+I[count1,count2]) - (I[count1,count2]+I[count1,count2])))
 
 def bicubic(point_2d,img):
     count1,count2 = point_2d
     I=img
-    I11_index = [1+np.floor(count1),1+np.floor(count2)]
-    I21_index = [1+np.floor(count1),1+np.ceil(count2)]
-    I12_index = [1+np.ceil(count1),1+np.floor(count2)]
-    I22_index = [1+np.ceil(count1),1+np.ceil(count2)]
+    I11_index = [int(1+np.floor(count1)),int(1+np.floor(count2))]
+    I21_index = [int(1+np.floor(count1)),int(1+np.ceil(count2))]
+    I12_index = [int(1+np.ceil(count1)),int(1+np.floor(count2))]
+    I22_index = [int(1+np.ceil(count1)),int(1+np.ceil(count2))]
     #%Calculate the four nearest function values
-    I11 = I[I11_index[1],I11_index[2]]
-    I21 = I[I21_index[1],I21_index[2]]
-    I12 = I[I12_index[1],I12_index[2]]
-    I22 = I[I22_index[1],I22_index[2]]
+    I11 = I[I11_index[0],I11_index[1]]
+    I21 = I[I21_index[0],I21_index[1]]
+    I12 = I[I12_index[0],I12_index[1]]
+    I22 = I[I22_index[0],I22_index[1]]
     #%Calculate the four nearest horizontal derivatives
-    Ix11 = Ix[I11_index[1],I11_index[2]]
-    Ix21 = Ix[I21_index[1],I21_index[2]]
-    Ix12 = Ix[I12_index[1],I12_index[2]]
-    Ix22 = Ix[I22_index[1],I22_index[2]]
+    Ix11 = Ix[I11_index[0],I11_index[1]]
+    Ix21 = Ix[I21_index[0],I21_index[1]]
+    Ix12 = Ix[I12_index[0],I12_index[1]]
+    Ix22 = Ix[I22_index[0],I22_index[1]]
     #%Calculate the four nearest vertical derivatives
-    Iy11 = Iy[I11_index[1],I11_index[2]]
-    Iy21 = Iy[I21_index[1],I21_index[2]]
-    Iy12 = Iy[I12_index[1],I12_index[2]]
-    Iy22 = Iy[I22_index[1],I22_index[2]]
+    Iy11 = Iy[I11_index[0],I11_index[1]]
+    Iy21 = Iy[I21_index[0],I21_index[1]]
+    Iy12 = Iy[I12_index[0],I12_index[1]]
+    Iy22 = Iy[I22_index[0],I22_index[1]]
     #%Calculate the four nearest cross derivatives
-    Ixy11 = Ixy[I11_index[1],I11_index[2]]
-    Ixy21 = Ixy[I21_index[1],I21_index[2]]
-    Ixy12 = Ixy[I12_index[1],I12_index[2]]
-    Ixy22 = Ixy[I22_index[1],I22_index[2]]
+    Ixy11 = Ixy[I11_index[0],I11_index[1]]
+    Ixy21 = Ixy[I21_index[0],I21_index[1]]
+    Ixy12 = Ixy[I12_index[0],I12_index[1]]
+    Ixy22 = Ixy[I22_index[0],I22_index[1]]
     #%Create our beta-vector
-    #beta = np.array([I11,I21,I12,I22,Ix11,Ix21,Ix12,Ix22,Iy11,Iy21,Iy12, Iy22, Ixy11, Ixy21, Ixy12, Ixy22])
-    beta2 = np.array(
-        [
-            [I11,I12,Iy11,Iy12],
-            [I21,I22,Iy21,Iy22],
-            [Ix11,Ix12,Ixy11, Ixy12],
-            [Ix21, Ix22, Ixy21, Ixy22]
-        ])
-    coef = np.matmul(np.matmul(M_dim_left,beta2),M_dim_right)
-    x_array = np.array([1,count1,count1*count1,count1*count1*count1])
-    y_array = np.array([1,count2,count2*count2,count2*count2*count2])
-    ans = np.matmul(np.matmul(x_array,coef),y_array)
+    beta = np.array([I11,I21,I12,I22,Ix11,Ix21,Ix12,Ix22,Iy11,Iy21,Iy12, Iy22, Ixy11, Ixy21, Ixy12, Ixy22])
+    # beta2 = np.array(
+    #     [
+    #         [I11,I12,Iy11,Iy12],
+    #         [I21,I22,Iy21,Iy22],
+    #         [Ix11,Ix12,Ixy11, Ixy12],
+    #         [Ix21, Ix22, Ixy21, Ixy22]
+    #     ])
+    coef = np.matmul(M,np.transpose(beta))
+    a00,a10,a20,a30,a01,a11,a21,a31,a02,a12,a22,a32,a03,a13,a23,a33 = np.transpose(coef)
+    coef_mat = np.transpose(np.array([
+        [a00,a10,a20,a30],
+        [a01,a11,a21,a31],
+        [a02,a12,a22,a32],
+        [a03,a13,a23,a33]
+    ]))
+    ans = np.polynomial.polynomial.polyval2d(count1,count2,coef_mat)
+    if ans > 255:
+        return 255
+    elif ans<0:
+        return 0
     return ans
         
 
 ###### end of bicubic #########
-def interpolation(kind,point_2d,img):
+def interpolation(kind,img):
     if(kind=='nearest_neighbor'):
-        return nearest_neighbor(point_2d,img)
+        return lambda point_2d : nearest_neighbor(point_2d,img)
     elif(kind=='bilinear'):
-        return bilinear(point_2d,img)
+        return lambda point_2d :  bilinear(point_2d,img)
     elif(kind=='bicubic'):
-        return bicubic(point_2d,img)
+        return lambda point_2d : bicubic(point_2d,img)
 
 
 
@@ -180,20 +250,15 @@ radius = 5
 ###IMAGE PLOT###
 fig,ax = plt.subplots(1,2)
 ax[0].imshow(img)
-ax[1].imshow(img2)
+ax[1].imshow(img)
 circle = plt.Circle(point, radius=radius, color='r',fill=False)
-circle2 = plt.Circle(point, radius=radius, color='r',fill=False)
+circle2 = plt.Circle(point, radius=radius, color='b',fill=False)
 ax[0].add_artist(circle)
 ax[1].add_artist(circle2)
 ax[0].set_title('Click to move the circle')
 
 def move_circle(event):
     global fig,circle,img,circle2
-    print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-        ('double' if event.dblclick else 'single', event.button,
-        event.x, event.y, event.xdata, event.ydata))
-    print(event.inaxes)
-    print(event.inaxes==ax[0])
     if event.inaxes is None:
         return
     if event.inaxes==ax[0]:
@@ -205,15 +270,49 @@ def move_circle(event):
             circle.center = event.xdata, event.ydata
     elif event.inaxes==ax[1]:
         circle2.center = event.xdata, event.ydata
-        ax[1].imshow(rotate_bound(img,getAngle(circle.center,circle2.center),circle.center))
-    #change_circle_in_img_2(event)
+        ax[1].imshow(change_circle_in_img_2(event,'bicubic'))
     fig.canvas.draw()
 
-def change_circle_in_img_2(event):
-    global img2,circle
+def change_circle_in_img_2(event,method):
+    global circle,circle2,img
+    c1 = circle.center
+    c2 = circle2.center
+    pow1 =  (c1[0]-c2[0])**2
+    pow2 = (c1[1]-c2[1])**2
+    sq = np.sqrt(pow1 + pow2)
+    if (sq>2*circle.radius):
+        print("bad")
+        raise Exception("too small")
+    interpolate = interpolation(method,img)
+    new_img = img.copy()
+    vect = (c2[0]-c1[0],c2[1]-c1[0])
+    vect_norm = (vect/np.linalg.norm(vect))
+    A = - circle.radius * vect_norm + circle.center
+    B = np.array( [circle.center[0],circle.center[1]])
+    C = np.array( [circle2.center[0],circle2.center[1]])
+    D = circle.radius * vect_norm + circle2.center
+    AB_to_AC = (A-C/np.linalg.norm(A-C))/(A-B/np.linalg.norm(A-B))
+    BD_to_CD = (C-D/np.linalg.norm(C-D))/(B-D/np.linalg.norm(B-D))
+    for i in range (0,img.shape[0]):
+        for j in range (0,img.shape[1]):
+            if ((np.sqrt((c1[0]-i)**2 + (c1[1]-j)**2)<circle.radius) or (np.sqrt((c2[0]-i)**2 + (c2[1]-j)**2)<circle2.radius)):
+                d = distance(circle.center,circle2.center,(i,j))
+                rate = 1-(d/circle.radius)
+                target_point = np.array([i,j]) 
+                if(np.abs( angle_between_vector((i,j),B,C))<np.pi/2):
+                    target_point = target_point + (B-A)*AB_to_AC
+                else:
+                    target_point = target_point + (D-B)*BD_to_CD
+                x = interpolate(target_point)
+                new_img[i,j] = x
+    img2 = cv2.imwrite("saber-bic.jpg",new_img)
+    return new_img
+
+
+
  
 
-print(bilinear((14.5,20.2),img))
+#print(bilinear((14.5,20.2),img))
 
 ##https://stackoverflow.com/questions/52365190/blur-a-specific-part-of-an-image
 #https://www.pyimagesearch.com/2017/01/02/rotate-images-correctly-with-opencv-and-python/
@@ -221,48 +320,3 @@ print(bilinear((14.5,20.2),img))
 fig.canvas.mpl_connect('button_press_event', move_circle)
 
 plt.show()
-
-
-
-def getBicPixel(img,x,y):
-  if (x < img.shape[1]) and (y < img.shape[0]):
-    return img[y,x]
-  return 0
-
-
-def Bicubic(img, rate):
-  new_w = int(np.ceil(float(img.shape[1]) * rate))
-  new_h = int(np.ceil(float(img.shape[0]) * rate))
-
-  new_img = np.zeros((new_w, new_h, 3))
-
-  x_rate = float(img.shape[1]) / img.shape[1]
-  y_rate = float(img.shape[0]) / img.shape[0]
-
-  C = np.zeros(5)
-
-  for hi in range(img.shape[0]):
-    for wi in range(img.shape[1]):
-        x_int = int(wi * x_rate)
-        y_int = int(hi * y_rate)
-        dx = x_rate * wi - x_int
-        dy = y_rate * hi - y_int
-        for jj in range(0,4):
-            o_y = y_int - 1 + jj
-            a0 = getBicPixel(img,x_int,o_y)
-            d0 = getBicPixel(img,x_int - 1,o_y) - a0
-            d2 = getBicPixel(img,x_int + 1,o_y) - a0
-            d3 = getBicPixel(img,x_int + 2,o_y) - a0
-            a1 = -1./3 * d0 + d2 - 1./6 * d3
-            a2 = 1./2 * d0 + 1./2 * d2
-            a3 = -1./6 * d0 - 1./2 * d2 + 1./6 * d3
-            C[jj] = a0 + a1 * dx + a2 * dx * dx + a3 * dx * dx * dx
-        d0 = C[0] - C[1]
-        d2 = C[2] - C[1]
-        d3 = C[3] - C[1]
-        a0 = C[1]
-        a1 = -1. / 3 * d0 + d2 - 1. / 6 * d3
-        a2 = 1. / 2 * d0 + 1. / 2 * d2
-        a3 = -1. / 6 * d0 - 1. / 2 * d2 + 1. / 6 * d3
-        new_img[hi, wi] = a0 + a1 * dy + a2 * dy * dy + a3 * dy * dy * dy
-  return new_img
